@@ -30,8 +30,6 @@ jobs:
     steps:
       - name: Test Monday Action
         uses: igoroctaviano/gh-monday-actions@main
-        env:
-          DEFAULT_MONDAY_API_TOKEN: ${{ secrets.DEFAULT_MONDAY_API_TOKEN }}
         with:
           commit_range: ${{ github.event.inputs.commit_range }}
           version: ${{ github.event.inputs.version }}
