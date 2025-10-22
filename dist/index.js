@@ -21,6 +21,8 @@ async function run() {
     const githubToken = core.getInput('github_token') || process.env.GITHUB_TOKEN;
     // Get Monday API token from input (required)
     const mondayApiToken = core.getInput('monday_api_token', { required: true });
+    // Get Monday board ID from input (required)
+    const mondayBoardId = core.getInput('monday_board_id', { required: true });
     
     if (!githubToken) {
       core.setFailed('GitHub token not found. Please provide github_token input or ensure GITHUB_TOKEN environment variable is available.');
@@ -58,7 +60,7 @@ async function run() {
     }
 
     // Update Monday.com tasks
-    await updateMondayTasks(mondayApiToken, taskIds, mondayColumnName, version, environment, description);
+    await updateMondayTasks(mondayApiToken, mondayBoardId, taskIds, mondayColumnName, version, environment, description);
 
     core.info('Successfully updated Monday.com tasks');
   } catch (error) {
@@ -167,22 +169,51 @@ function extractTaskIdsFromPRs(pullRequests) {
   return Array.from(taskIds);
 }
 
-async function updateMondayTasks(apiToken, taskIds, columnName, version, environment, description) {
+async function updateMondayTasks(apiToken, boardId, taskIds, columnName, version, environment, description) {
   const mondayApiUrl = 'https://api.monday.com/v2';
   const headers = {
     'Authorization': apiToken,
     'Content-Type': 'application/json'
   };
 
+  // First, we need to get the board ID
+  // This is a simplified approach - in practice, you might want to make this configurable
+  core.info('Getting board information from Monday.com');
+  
+  const boardsQuery = `
+    query {
+      me {
+        id
+        name
+      }
+    }
+  `;
+
+  try {
+    const { data: boardsData } = await axios.post(mondayApiUrl, {
+      query: boardsQuery
+    }, { headers });
+
+    if (boardsData.errors) {
+      core.error('Failed to get user info:', boardsData.errors);
+      return;
+    }
+
+    core.info('Successfully connected to Monday.com API');
+  } catch (error) {
+    core.error('Failed to connect to Monday.com:', error.message);
+    return;
+  }
+
   for (const taskId of taskIds) {
     try {
       core.info(`Looking for task ${taskId} in Monday.com`);
       
       // First, get the task details to find the item ID
-      // Use the updated Monday.com API syntax
+      // Use the updated Monday.com API syntax with board_id and columns
       let taskQuery = `
         query {
-          items_page_by_column_values(limit: 1, column_id: "name", column_values: ["${taskId}"]) {
+          items_page_by_column_values(limit: 1, board_id: ${boardId}, columns: [{column_id: "name", column_values: ["${taskId}"]}]) {
             items {
               id
               name
@@ -198,7 +229,7 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       // Alternative query if the first one fails
       const alternativeQuery = `
         query {
-          items_page_by_column_values(limit: 1, column_id: "title", column_values: ["${taskId}"]) {
+          items_page_by_column_values(limit: 1, board_id: ${boardId}, columns: [{column_id: "title", column_values: ["${taskId}"]}]) {
             items {
               id
               name
