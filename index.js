@@ -12,7 +12,7 @@ async function run() {
     const description = core.getInput('description', { required: true });
     const mondayColumnName = core.getInput('monday_column_name', { required: true });
     const githubToken = core.getInput('github_token') || process.env.GITHUB_TOKEN;
-    // Try to get Monday API token from input, then environment (your repo's default)
+    // Try to get Monday API token from input, then use default token
     const mondayApiToken = core.getInput('monday_api_token') || process.env.MONDAY_API_TOKEN;
     
     if (!githubToken) {
