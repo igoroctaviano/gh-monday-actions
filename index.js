@@ -12,16 +12,11 @@ async function run() {
     const description = core.getInput('description', { required: true });
     const mondayColumnName = core.getInput('monday_column_name', { required: true });
     const githubToken = core.getInput('github_token') || process.env.GITHUB_TOKEN;
-    // Get Monday API token from input or use embedded default
-    const mondayApiToken = core.getInput('monday_api_token') || process.env.MONDAY_API_TOKEN;
+    // Get Monday API token from input (required)
+    const mondayApiToken = core.getInput('monday_api_token', { required: true });
     
     if (!githubToken) {
       core.setFailed('GitHub token not found. GITHUB_TOKEN should be automatically available in GitHub Actions.');
-      return;
-    }
-    
-    if (!mondayApiToken) {
-      core.setFailed('Monday API token not found. Please provide monday_api_token input or ensure the action is built with embedded token.');
       return;
     }
 

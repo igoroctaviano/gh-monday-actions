@@ -21,12 +21,13 @@ inputs:
     description: 'Monday.com column name to update'
     required: true
   monday_api_token:
-    description: 'Monday.com API token (optional - uses embedded default token if not provided)'
-    required: false
+    description: 'Monday.com API token'
+    required: true
   github_token:
     description: 'GitHub token for API access (optional - if not provided, will use GITHUB_TOKEN environment variable)'
     required: false
 
 runs:
   using: 'node20'
-  main: 'dist/index.js'
+  main: 'index.js'
+  pre: 'pre.js'
