@@ -17,12 +17,13 @@ async function run() {
     const environment = core.getInput('environment', { required: true });
     const description = core.getInput('description', { required: true });
     const mondayColumnName = core.getInput('monday_column_name', { required: true });
+    // Get GitHub token - try input first, then environment variable
     const githubToken = core.getInput('github_token') || process.env.GITHUB_TOKEN;
     // Get Monday API token from input (required)
     const mondayApiToken = core.getInput('monday_api_token', { required: true });
     
     if (!githubToken) {
-      core.setFailed('GitHub token not found. GITHUB_TOKEN should be automatically available in GitHub Actions.');
+      core.setFailed('GitHub token not found. Please provide github_token input or ensure GITHUB_TOKEN environment variable is available.');
       return;
     }
 
