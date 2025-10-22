@@ -20,12 +20,9 @@ inputs:
   monday_column_name:
     description: 'Monday.com column name to update'
     required: true
-  github_token:
-    description: 'GitHub token for API access'
-    required: true
   monday_api_token:
-    description: 'Monday.com API token'
-    required: true
+    description: 'Monday.com API token (optional - if not provided, will use MONDAY_API_TOKEN environment variable)'
+    required: false
 
 runs:
   using: 'node20'

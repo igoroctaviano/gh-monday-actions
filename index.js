@@ -11,8 +11,18 @@ async function run() {
     const environment = core.getInput('environment', { required: true });
     const description = core.getInput('description', { required: true });
     const mondayColumnName = core.getInput('monday_column_name', { required: true });
-    const githubToken = core.getInput('github_token', { required: true });
-    const mondayApiToken = core.getInput('monday_api_token', { required: true });
+    const githubToken = process.env.GITHUB_TOKEN;
+    const mondayApiToken = core.getInput('monday_api_token') || process.env.MONDAY_API_TOKEN;
+    
+    if (!githubToken) {
+      core.setFailed('GitHub token not found. GITHUB_TOKEN should be automatically available in GitHub Actions.');
+      return;
+    }
+    
+    if (!mondayApiToken) {
+      core.setFailed('Monday API token not found. Please provide monday_api_token input or set MONDAY_API_TOKEN environment variable.');
+      return;
+    }
 
     core.info(`Processing commit range: ${commitRange}`);
     core.info(`Version: ${version}, Environment: ${environment}`);
