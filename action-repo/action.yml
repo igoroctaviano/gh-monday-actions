@@ -1,6 +1,6 @@
 name: 'Update Monday.com Tasks'
 description: 'Updates Monday.com tasks based on PR descriptions and commit ranges'
-author: 'Your Name'
+author: 'igoroctaviano'
 branding:
   icon: 'calendar'
   color: 'blue'
@@ -22,6 +22,9 @@ inputs:
     required: true
   monday_api_token:
     description: 'Monday.com API token (optional - if not provided, will use MONDAY_API_TOKEN environment variable)'
+    required: false
+  github_token:
+    description: 'GitHub token for API access (optional - if not provided, will use GITHUB_TOKEN environment variable)'
     required: false
 
 runs:

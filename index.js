@@ -11,7 +11,7 @@ async function run() {
     const environment = core.getInput('environment', { required: true });
     const description = core.getInput('description', { required: true });
     const mondayColumnName = core.getInput('monday_column_name', { required: true });
-    const githubToken = process.env.GITHUB_TOKEN;
+    const githubToken = core.getInput('github_token') || process.env.GITHUB_TOKEN;
     const mondayApiToken = core.getInput('monday_api_token') || process.env.MONDAY_API_TOKEN;
     
     if (!githubToken) {
