@@ -52,4 +52,4 @@ jobs:
           environment: ${{ github.event.inputs.environment }}
           description: ${{ github.event.inputs.description }}
           monday_column_name: ${{ github.event.inputs.monday_column_name }}
-          # monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}  # Optional: if not provided, will use MONDAY_API_TOKEN env var
+          monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}
