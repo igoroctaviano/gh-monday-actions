@@ -173,8 +173,8 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       core.info(`Looking for task ${taskId} in Monday.com`);
       
       // First, get the task details to find the item ID
-      // Using a more flexible search approach
-      const taskQuery = `
+      // Try multiple approaches to find the task
+      let taskQuery = `
         query {
           items_by_column_values(column_id: "name", column_values: ["${taskId}"]) {
             id
@@ -187,15 +187,48 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         }
       `;
 
-      const { data: taskData } = await axios.post(mondayApiUrl, {
-        query: taskQuery
-      }, { headers });
+      // Alternative query if the first one fails
+      const alternativeQuery = `
+        query {
+          items_by_column_values(column_id: "title", column_values: ["${taskId}"]) {
+            id
+            name
+            column_values {
+              id
+              text
+            }
+          }
+        }
+      `;
+
+      let taskData;
+      
+      // Try the first query
+      try {
+        const response = await axios.post(mondayApiUrl, {
+          query: taskQuery
+        }, { headers });
+        taskData = response.data;
+      } catch (error) {
+        core.warning(`First query failed for task ${taskId}, trying alternative: ${error.message}`);
+        // Try alternative query
+        const response = await axios.post(mondayApiUrl, {
+          query: alternativeQuery
+        }, { headers });
+        taskData = response.data;
+      }
 
       core.info(`Monday.com API response for task ${taskId}:`, JSON.stringify(taskData, null, 2));
 
       // Check for API errors first
       if (taskData.errors) {
-        core.error(`Monday.com API errors for task ${taskId}:`, JSON.stringify(taskData.errors));
+        core.error(`Monday.com API errors for task ${taskId}:`);
+        for (const error of taskData.errors) {
+          core.error(`  - ${error.message}`);
+          if (error.extensions) {
+            core.error(`    Extensions: ${JSON.stringify(error.extensions)}`);
+          }
+        }
         continue;
       }
 
@@ -229,7 +262,10 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
 
       // Check for update errors
       if (updateData.errors) {
-        core.error(`Failed to update column for task ${taskId}:`, JSON.stringify(updateData.errors));
+        core.error(`Failed to update column for task ${taskId}:`);
+        for (const error of updateData.errors) {
+          core.error(`  - ${error.message}`);
+        }
         continue;
       }
 
@@ -256,7 +292,10 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
 
       // Check for comment errors
       if (commentData.errors) {
-        core.error(`Failed to add comment for task ${taskId}:`, JSON.stringify(commentData.errors));
+        core.error(`Failed to add comment for task ${taskId}:`);
+        for (const error of commentData.errors) {
+          core.error(`  - ${error.message}`);
+        }
       } else {
         core.info(`Successfully added comment to task ${taskId}`);
       }
