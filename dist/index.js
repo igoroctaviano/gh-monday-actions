@@ -179,15 +179,17 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       core.info(`Looking for task ${taskId} in Monday.com`);
       
       // First, get the task details to find the item ID
-      // Try multiple approaches to find the task
+      // Use the updated Monday.com API syntax
       let taskQuery = `
         query {
-          items_by_column_values(column_id: "name", column_values: ["${taskId}"]) {
-            id
-            name
-            column_values {
+          items_page_by_column_values(limit: 1, column_id: "name", column_values: ["${taskId}"]) {
+            items {
               id
-              text
+              name
+              column_values {
+                id
+                text
+              }
             }
           }
         }
@@ -196,12 +198,14 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       // Alternative query if the first one fails
       const alternativeQuery = `
         query {
-          items_by_column_values(column_id: "title", column_values: ["${taskId}"]) {
-            id
-            name
-            column_values {
+          items_page_by_column_values(limit: 1, column_id: "title", column_values: ["${taskId}"]) {
+            items {
               id
-              text
+              name
+              column_values {
+                id
+                text
+              }
             }
           }
         }
@@ -238,12 +242,12 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         continue;
       }
 
-      if (!taskData.data || !taskData.data.items_by_column_values || taskData.data.items_by_column_values.length === 0) {
+      if (!taskData.data || !taskData.data.items_page_by_column_values || !taskData.data.items_page_by_column_values.items || taskData.data.items_page_by_column_values.items.length === 0) {
         core.warning(`Task ${taskId} not found in Monday.com`);
         continue;
       }
 
-      const itemId = taskData.data.items_by_column_values[0].id;
+      const itemId = taskData.data.items_page_by_column_values.items[0].id;
       core.info(`Found task ${taskId} with item ID: ${itemId}`);
 
       // Update the column value
