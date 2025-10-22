@@ -1,4 +1,4 @@
-# GitHub Action: Update Monday.com Tasks
+# igoroctaviano/gh-monday-actions
 
 This GitHub Action automatically updates Monday.com tasks based on pull request descriptions within a specified commit range.
 
