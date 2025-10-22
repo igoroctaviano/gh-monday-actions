@@ -1,0 +1,49 @@
+name: Update Monday.com Tasks
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_range:
+        description: 'Commit hash range (e.g., abc123..def456)'
+        required: true
+        type: string
+      version:
+        description: 'Version number'
+        required: true
+        type: string
+      environment:
+        description: 'Environment (e.g., staging, production)'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+          - development
+      description:
+        description: 'Deployment description'
+        required: true
+        type: string
+      monday_column_name:
+        description: 'Monday.com column name to update'
+        required: true
+        type: string
+
+jobs:
+  update-monday-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history to access commit range
+      
+      - name: Update Monday.com tasks
+        uses: ./.github/actions/update-monday-tasks
+        with:
+          commit_range: ${{ github.event.inputs.commit_range }}
+          version: ${{ github.event.inputs.version }}
+          environment: ${{ github.event.inputs.environment }}
+          description: ${{ github.event.inputs.description }}
+          monday_column_name: ${{ github.event.inputs.monday_column_name }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}

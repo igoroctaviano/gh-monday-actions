@@ -1,0 +1,28 @@
+name: 'Update Monday.com Tasks'
+description: 'Updates Monday.com tasks based on PR descriptions and commit ranges'
+inputs:
+  commit_range:
+    description: 'Commit hash range (e.g., abc123..def456)'
+    required: true
+  version:
+    description: 'Version number'
+    required: true
+  environment:
+    description: 'Environment (e.g., staging, production)'
+    required: true
+  description:
+    description: 'Deployment description'
+    required: true
+  monday_column_name:
+    description: 'Monday.com column name to update'
+    required: true
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+  monday_api_token:
+    description: 'Monday.com API token'
+    required: true
+
+runs:
+  using: 'node20'
+  main: 'index.js'

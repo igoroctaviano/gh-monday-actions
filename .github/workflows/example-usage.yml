@@ -1,0 +1,57 @@
+# Example usage of the Update Monday.com Tasks action
+# This file shows how to use the action in different scenarios
+
+name: Example - Update Monday.com Tasks
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_range:
+        description: 'Commit hash range (e.g., abc123..def456)'
+        required: true
+        type: string
+        default: 'HEAD~10..HEAD'
+      version:
+        description: 'Version number'
+        required: true
+        type: string
+        default: '1.0.0'
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+          - development
+        default: 'staging'
+      description:
+        description: 'Deployment description'
+        required: true
+        type: string
+        default: 'Example deployment'
+      monday_column_name:
+        description: 'Monday.com column name'
+        required: true
+        type: string
+        default: 'Deployment Status'
+
+jobs:
+  update-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Update Monday.com tasks
+        uses: ./.github/actions/update-monday-tasks
+        with:
+          commit_range: ${{ github.event.inputs.commit_range }}
+          version: ${{ github.event.inputs.version }}
+          environment: ${{ github.event.inputs.environment }}
+          description: ${{ github.event.inputs.description }}
+          monday_column_name: ${{ github.event.inputs.monday_column_name }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}
