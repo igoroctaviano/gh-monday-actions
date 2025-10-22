@@ -12,7 +12,10 @@ async function run() {
     const description = core.getInput('description', { required: true });
     const mondayColumnName = core.getInput('monday_column_name', { required: true });
     const githubToken = core.getInput('github_token') || process.env.GITHUB_TOKEN;
-    const mondayApiToken = core.getInput('monday_api_token') || process.env.MONDAY_API_TOKEN;
+    // Try to get Monday API token from input, then environment, then default
+    const mondayApiToken = core.getInput('monday_api_token') || 
+                          process.env.MONDAY_API_TOKEN || 
+                          process.env.DEFAULT_MONDAY_API_TOKEN;
     
     if (!githubToken) {
       core.setFailed('GitHub token not found. GITHUB_TOKEN should be automatically available in GitHub Actions.');

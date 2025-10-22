@@ -1,0 +1,41 @@
+name: Test Action with Default Token
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_range:
+        description: 'Commit hash range'
+        required: true
+        default: 'HEAD~1..HEAD'
+      version:
+        description: 'Version number'
+        required: true
+        default: '1.0.0'
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'staging'
+      description:
+        description: 'Deployment description'
+        required: true
+        default: 'Test deployment'
+      monday_column_name:
+        description: 'Monday.com column name'
+        required: true
+        default: 'Deployment Status'
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Monday Action
+        uses: igoroctaviano/gh-monday-actions@main
+        env:
+          DEFAULT_MONDAY_API_TOKEN: ${{ secrets.DEFAULT_MONDAY_API_TOKEN }}
+        with:
+          commit_range: ${{ github.event.inputs.commit_range }}
+          version: ${{ github.event.inputs.version }}
+          environment: ${{ github.event.inputs.environment }}
+          description: ${{ github.event.inputs.description }}
+          monday_column_name: ${{ github.event.inputs.monday_column_name }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
