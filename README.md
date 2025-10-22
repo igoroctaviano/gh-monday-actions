@@ -27,27 +27,67 @@ To get your Monday.com API token:
 3. Generate a new API token
 4. Add it as a repository secret named `MONDAY_API_TOKEN`
 
-### 3. Using the Action
-
-Add this to your repository's `.github/workflows/` directory or copy from `examples/` folder.
-
 ## Usage
 
-### Using the Action
+### Quick Start
 
-Use this action in any repository:
+Copy this workflow to your repository's `.github/workflows/` directory:
 
 ```yaml
-- name: Update Monday.com tasks
-  uses: igoroctaviano/gh-monday-actions@v1
-  with:
-    commit_range: ${{ github.event.inputs.commit_range }}
-    version: ${{ github.event.inputs.version }}
-    environment: ${{ github.event.inputs.environment }}
-    description: ${{ github.event.inputs.description }}
-    monday_column_name: ${{ github.event.inputs.monday_column_name }}
-    github_token: ${{ secrets.GITHUB_TOKEN }}
-    monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}
+name: Update Monday.com Tasks
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_range:
+        description: 'Commit hash range (e.g., abc123..def456)'
+        required: true
+        type: string
+        default: 'HEAD~10..HEAD'
+      version:
+        description: 'Version number'
+        required: true
+        type: string
+        default: '1.0.0'
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+          - development
+        default: 'staging'
+      description:
+        description: 'Deployment description'
+        required: true
+        type: string
+        default: 'Deployment update'
+      monday_column_name:
+        description: 'Monday.com column name to update'
+        required: true
+        type: string
+        default: 'Deployment Status'
+
+jobs:
+  update-monday-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Update Monday.com tasks
+        uses: igoroctaviano/gh-monday-actions@v1
+        with:
+          commit_range: ${{ github.event.inputs.commit_range }}
+          version: ${{ github.event.inputs.version }}
+          environment: ${{ github.event.inputs.environment }}
+          description: ${{ github.event.inputs.description }}
+          monday_column_name: ${{ github.event.inputs.monday_column_name }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}
 ```
 
 ### Manual Trigger
@@ -72,16 +112,7 @@ Use this action in any repository:
 | `description` | Deployment description | Yes | `Bug fixes and improvements` |
 | `monday_column_name` | Monday.com column name | Yes | `Deployment Status` |
 
-## How It Works
-
-1. **Commit Analysis**: The action analyzes the specified commit range to find all commits
-2. **PR Discovery**: It identifies pull requests associated with those commits
-3. **Task ID Extraction**: It parses PD descriptions looking for "Ticket number:" followed by task IDs
-4. **Monday.com Updates**: For each task ID found:
-   - Updates the specified column with `{environment}{version}` (e.g., `staging1.2.3`)
-   - Adds a formatted comment with version, environment, and description
-
-## PR Description Format
+### PR Description Format
 
 Your pull request descriptions should include task IDs in this format:
 
@@ -89,22 +120,26 @@ Your pull request descriptions should include task IDs in this format:
 Ticket number: TASK-123
 ```
 
-The action will extract `TASK-123` and update the corresponding Monday.com task.
+### What the Action Does
 
-## Monday.com Column Update
+1. **Analyzes commits** in the specified range
+2. **Finds associated PRs** for those commits
+3. **Extracts task IDs** from PR descriptions using "Ticket number:" format
+4. **Updates Monday.com tasks** with:
+   - Column value: `{environment}{version}` (e.g., `staging1.2.3`)
+   - Comment with version, environment, and description
 
-The specified column will be updated with the concatenated environment and version:
-- Example: `staging1.2.3` or `production2.0.1`
+### Example Output
 
-## Comments Added to Monday.com Tasks
+For a task with ID `TASK-123`, the action will:
+- Update the specified column with `staging1.2.3`
+- Add a comment:
+  ```
+  Version: 1.2.3
+  Environment: staging
+  Description: Bug fixes and improvements
+  ```
 
-Each updated task will receive a comment in this format:
-
-```
-Version: 1.2.3
-Environment: staging
-Description: Bug fixes and improvements
-```
 
 ## Error Handling
 
