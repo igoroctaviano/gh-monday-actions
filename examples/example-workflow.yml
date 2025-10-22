@@ -1,3 +1,4 @@
+# Example: Using gh-monday-actions
 name: Update Monday.com Tasks
 
 on:
@@ -7,26 +8,31 @@ on:
         description: 'Commit hash range (e.g., abc123..def456)'
         required: true
         type: string
+        default: 'HEAD~10..HEAD'
       version:
         description: 'Version number'
         required: true
         type: string
+        default: '1.0.0'
       environment:
-        description: 'Environment (e.g., staging, production)'
+        description: 'Environment'
         required: true
         type: choice
         options:
           - staging
           - production
           - development
+        default: 'staging'
       description:
         description: 'Deployment description'
         required: true
         type: string
+        default: 'Example deployment'
       monday_column_name:
-        description: 'Monday.com column name to update'
+        description: 'Monday.com column name'
         required: true
         type: string
+        default: 'Deployment Status'
 
 jobs:
   update-monday-tasks:
@@ -35,10 +41,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history to access commit range
+          fetch-depth: 0
       
+      # Using gh-monday-actions
       - name: Update Monday.com tasks
-        uses: ./.github/actions/update-monday-tasks
+        uses: igoroctaviano/gh-monday-actions@v1
         with:
           commit_range: ${{ github.event.inputs.commit_range }}
           version: ${{ github.event.inputs.version }}

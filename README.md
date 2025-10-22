@@ -27,22 +27,28 @@ To get your Monday.com API token:
 3. Generate a new API token
 4. Add it as a repository secret named `MONDAY_API_TOKEN`
 
-### 3. Repository Structure
+### 3. Using the Action
 
-The action expects your repository to have the following structure:
-
-```
-.github/
-├── workflows/
-│   └── update-monday-tasks.yml
-└── actions/
-    └── update-monday-tasks/
-        ├── action.yml
-        ├── package.json
-        └── index.js
-```
+Add this to your repository's `.github/workflows/` directory or copy from `examples/` folder.
 
 ## Usage
+
+### Using the Action
+
+Use this action in any repository:
+
+```yaml
+- name: Update Monday.com tasks
+  uses: igoroctaviano/gh-monday-actions@v1
+  with:
+    commit_range: ${{ github.event.inputs.commit_range }}
+    version: ${{ github.event.inputs.version }}
+    environment: ${{ github.event.inputs.environment }}
+    description: ${{ github.event.inputs.description }}
+    monday_column_name: ${{ github.event.inputs.monday_column_name }}
+    github_token: ${{ secrets.GITHUB_TOKEN }}
+    monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}
+```
 
 ### Manual Trigger
 
@@ -127,4 +133,11 @@ Enable debug logging by adding this secret to your repository:
 - `ACTIONS_STEP_DEBUG`: `true`
 
 This will provide detailed logs of the action's execution.
-# gh-monday-actions
+
+## Publishing
+
+This repository is the GitHub Action itself. To publish:
+
+1. **Build the action**: `npm run build`
+2. **Create a release**: Push a tag like `v1.0.0`
+3. **Use the action**: `uses: igoroctaviano/gh-monday-actions@v1`

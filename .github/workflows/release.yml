@@ -1,0 +1,66 @@
+name: Release Action
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build action
+        run: npm run build
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## Changes in this Release
+            
+            - Updated Monday.com task integration
+            - Improved PR parsing and task ID extraction
+            - Enhanced error handling and logging
+            
+            ## Usage
+            
+            ```yaml
+            - name: Update Monday.com tasks
+              uses: igoroctaviano/gh-monday-actions@${{ github.ref_name }}
+              with:
+                commit_range: ${{ github.event.inputs.commit_range }}
+                version: ${{ github.event.inputs.version }}
+                environment: ${{ github.event.inputs.environment }}
+                description: ${{ github.event.inputs.description }}
+                monday_column_name: ${{ github.event.inputs.monday_column_name }}
+                github_token: ${{ secrets.GITHUB_TOKEN }}
+                monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}
+            ```
+          draft: false
+          prerelease: false
+
+      - name: Upload Action Artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/index.js
+          asset_name: index.js
+          asset_content_type: application/javascript

@@ -199,4 +199,10 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
   }
 }
 
-run();
+// Export the run function for testing
+module.exports = { run };
+
+// Run the action if this file is executed directly
+if (require.main === module) {
+  run();
+}
