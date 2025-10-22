@@ -37,10 +37,16 @@ async function run() {
     // Get commits in the range
     const commits = getCommitsInRange(commitRange);
     core.info(`Found ${commits.length} commits in range`);
+    core.info(`Commits: ${commits.join(', ')}`);
 
     // Find PRs for these commits
     const pullRequests = await findPullRequestsForCommits(octokit, commits, context.repo);
     core.info(`Found ${pullRequests.length} pull requests`);
+    
+    // Log PR details for debugging
+    for (const pr of pullRequests) {
+      core.info(`PR #${pr.number}: "${pr.title}" - Body: ${pr.body ? pr.body.substring(0, 100) + '...' : 'No body'}`);
+    }
 
     // Extract task IDs from PR descriptions
     const taskIds = extractTaskIdsFromPRs(pullRequests);
@@ -77,43 +83,69 @@ async function findPullRequestsForCommits(octokit, commits, repo) {
 
   for (const commitHash of commits) {
     try {
-      // Get commit details
-      const { data: commit } = await octokit.rest.repos.getCommit({
+      core.info(`Looking for PRs associated with commit: ${commitHash}`);
+      
+      // Use GitHub's API to find PRs associated with this commit
+      // This is more efficient than listing all PRs
+      const { data: associatedPRs } = await octokit.rest.repos.listPullRequestsAssociatedWithCommit({
         owner: repo.owner,
         repo: repo.repo,
-        ref: commitHash
+        commit_sha: commitHash
       });
 
-      // Find PRs that contain this commit
-      const { data: prs } = await octokit.rest.pulls.list({
-        owner: repo.owner,
-        repo: repo.repo,
-        state: 'all',
-        sort: 'updated',
-        direction: 'desc'
-      });
+      core.info(`Found ${associatedPRs.length} PRs for commit ${commitHash}`);
 
-      for (const pr of prs) {
-        if (commitHash === pr.merge_commit_sha || 
-            commitHash === pr.head.sha ||
-            (pr.commits && pr.commits.some(c => c.sha === commitHash))) {
-          
-          // Get full PR details including description
-          const { data: fullPR } = await octokit.rest.pulls.get({
-            owner: repo.owner,
-            repo: repo.repo,
-            pull_number: pr.number
-          });
+      for (const pr of associatedPRs) {
+        // Get full PR details including description
+        const { data: fullPR } = await octokit.rest.pulls.get({
+          owner: repo.owner,
+          repo: repo.repo,
+          pull_number: pr.number
+        });
 
-          pullRequests.set(pr.number, fullPR);
-        }
+        pullRequests.set(pr.number, fullPR);
+        core.info(`Added PR #${pr.number}: "${fullPR.title}"`);
       }
     } catch (error) {
       core.warning(`Failed to process commit ${commitHash}: ${error.message}`);
+      // Fallback: try the old method if the new API fails
+      try {
+        core.info(`Trying fallback method for commit ${commitHash}`);
+        await findPRsFallbackMethod(octokit, commitHash, repo, pullRequests);
+      } catch (fallbackError) {
+        core.warning(`Fallback method also failed for commit ${commitHash}: ${fallbackError.message}`);
+      }
     }
   }
 
   return Array.from(pullRequests.values());
+}
+
+// Fallback method using the original approach
+async function findPRsFallbackMethod(octokit, commitHash, repo, pullRequests) {
+  const { data: prs } = await octokit.rest.pulls.list({
+    owner: repo.owner,
+    repo: repo.repo,
+    state: 'all',
+    sort: 'updated',
+    direction: 'desc',
+    per_page: 100 // Limit to avoid too many API calls
+  });
+
+  for (const pr of prs) {
+    if (commitHash === pr.merge_commit_sha || 
+        commitHash === pr.head.sha) {
+      
+      const { data: fullPR } = await octokit.rest.pulls.get({
+        owner: repo.owner,
+        repo: repo.repo,
+        pull_number: pr.number
+      });
+
+      pullRequests.set(pr.number, fullPR);
+      core.info(`Added PR #${pr.number} via fallback: "${fullPR.title}"`);
+    }
+  }
 }
 
 function extractTaskIdsFromPRs(pullRequests) {
