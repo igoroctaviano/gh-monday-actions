@@ -176,12 +176,19 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
 
   for (const taskId of taskIds) {
     try {
+      core.info(`Looking for task ${taskId} in Monday.com`);
+      
       // First, get the task details to find the item ID
+      // Using a more flexible search approach
       const taskQuery = `
         query {
           items_by_column_values(column_id: "name", column_values: ["${taskId}"]) {
             id
             name
+            column_values {
+              id
+              text
+            }
           }
         }
       `;
@@ -190,15 +197,25 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         query: taskQuery
       }, { headers });
 
-      if (!taskData.data.items_by_column_values || taskData.data.items_by_column_values.length === 0) {
+      core.info(`Monday.com API response for task ${taskId}:`, JSON.stringify(taskData, null, 2));
+
+      // Check for API errors first
+      if (taskData.errors) {
+        core.error(`Monday.com API errors for task ${taskId}:`, JSON.stringify(taskData.errors));
+        continue;
+      }
+
+      if (!taskData.data || !taskData.data.items_by_column_values || taskData.data.items_by_column_values.length === 0) {
         core.warning(`Task ${taskId} not found in Monday.com`);
         continue;
       }
 
       const itemId = taskData.data.items_by_column_values[0].id;
+      core.info(`Found task ${taskId} with item ID: ${itemId}`);
 
       // Update the column value
       const columnValue = `${environment}${version}`;
+      core.info(`Updating column "${columnName}" with value: "${columnValue}"`);
       
       const updateMutation = `
         mutation {
@@ -212,12 +229,21 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         }
       `;
 
-      await axios.post(mondayApiUrl, {
+      const { data: updateData } = await axios.post(mondayApiUrl, {
         query: updateMutation
       }, { headers });
 
+      // Check for update errors
+      if (updateData.errors) {
+        core.error(`Failed to update column for task ${taskId}:`, JSON.stringify(updateData.errors));
+        continue;
+      }
+
+      core.info(`Successfully updated column for task ${taskId}`);
+
       // Add comment to the task
       const commentText = `Version: ${version}\nEnvironment: ${environment}\nDescription: ${description}`;
+      core.info(`Adding comment to task ${taskId}: ${commentText}`);
       
       const commentMutation = `
         mutation {
@@ -230,9 +256,16 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         }
       `;
 
-      await axios.post(mondayApiUrl, {
+      const { data: commentData } = await axios.post(mondayApiUrl, {
         query: commentMutation
       }, { headers });
+
+      // Check for comment errors
+      if (commentData.errors) {
+        core.error(`Failed to add comment for task ${taskId}:`, JSON.stringify(commentData.errors));
+      } else {
+        core.info(`Successfully added comment to task ${taskId}`);
+      }
 
       core.info(`Successfully updated task ${taskId} (item ID: ${itemId})`);
     } catch (error) {
