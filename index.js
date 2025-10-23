@@ -325,19 +325,59 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         continue;
       }
 
-      core.info(`Found task ${taskId} with item ID: ${itemId}`);
+      // First, let's get the column information to understand the structure
+      const columnInfoQuery = `
+        query {
+          items(ids: [${itemId}]) {
+            id
+            name
+            column_values {
+              id
+              title
+              type
+              text
+            }
+          }
+        }
+      `;
+
+      core.info(`Getting column information for item ${itemId}`);
+      const { data: columnData } = await axios.post(mondayApiUrl, {
+        query: columnInfoQuery
+      }, { headers });
+
+      if (columnData.data && columnData.data.items && columnData.data.items.length > 0) {
+        const item = columnData.data.items[0];
+        core.info(`Item columns:`, JSON.stringify(item.column_values, null, 2));
+        
+        // Find the column by name
+        const targetColumn = item.column_values.find(col => col.title === columnName);
+        if (targetColumn) {
+          core.info(`Found target column: ${targetColumn.title} (ID: ${targetColumn.id}, Type: ${targetColumn.type})`);
+        } else {
+          core.warning(`Column "${columnName}" not found. Available columns:`, item.column_values.map(col => col.title).join(', '));
+        }
+      }
 
       // Update the column value
       const columnValue = `${environment}${version}`;
       core.info(`Updating column "${columnName}" with value: "${columnValue}"`);
       
-      // Format the value as a JSON object for Monday.com API
-      // For text columns, the value should be wrapped in a JSON object
-      const jsonValue = {
+      // Try different JSON formats for Monday.com API
+      // Format 1: Simple text format
+      const jsonValue1 = {
         text: columnValue
       };
       
-      core.info(`JSON value object: ${JSON.stringify(jsonValue)}`);
+      // Format 2: String format (some columns might expect this)
+      const jsonValue2 = columnValue;
+      
+      // Format 3: Object with value property
+      const jsonValue3 = {
+        value: columnValue
+      };
+      
+      core.info(`Trying JSON format 1: ${JSON.stringify(jsonValue1)}`);
       
       const updateMutation = `
         mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
@@ -356,7 +396,7 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         boardId: boardId,
         itemId: itemId,
         columnId: columnName,
-        value: jsonValue
+        value: jsonValue1
       };
 
       core.info(`Executing update mutation with variables:`, JSON.stringify(variables));
