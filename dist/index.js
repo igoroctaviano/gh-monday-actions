@@ -60,7 +60,7 @@ async function run() {
     }
 
     // Update Monday.com tasks
-    await updateMondayTasks(mondayApiToken, mondayBoardId, taskIds, mondayColumnName, version, environment, description);
+    await updateMondayTasks(mondayApiToken, taskIds, mondayColumnName, version, environment, description);
 
     core.info('Successfully updated Monday.com tasks');
   } catch (error) {
@@ -169,39 +169,51 @@ function extractTaskIdsFromPRs(pullRequests) {
   return Array.from(taskIds);
 }
 
-async function updateMondayTasks(apiToken, boardId, taskIds, columnName, version, environment, description) {
+async function updateMondayTasks(apiToken, taskIds, columnName, version, environment, description) {
   const mondayApiUrl = 'https://api.monday.com/v2';
   const headers = {
     'Authorization': apiToken,
     'Content-Type': 'application/json'
   };
 
-  // First, we need to get the board ID
-  // This is a simplified approach - in practice, you might want to make this configurable
-  core.info('Getting board information from Monday.com');
+  // First, try to find the board ID from the first task ID
+  let boardId = null;
   
-  const boardsQuery = `
-    query {
-      me {
-        id
-        name
+  if (taskIds.length > 0) {
+    core.info(`Attempting to find board ID from task ID: ${taskIds[0]}`);
+    
+    try {
+      // Try to get item information to find the board
+      const itemQuery = `
+        query {
+          items(ids: [${taskIds[0]}]) {
+            id
+            name
+            board {
+              id
+              name
+            }
+          }
+        }
+      `;
+
+      const { data: itemData } = await axios.post(mondayApiUrl, {
+        query: itemQuery
+      }, { headers });
+
+      if (itemData.errors) {
+        core.error('Failed to get item info:', itemData.errors);
+      } else if (itemData.data && itemData.data.items && itemData.data.items.length > 0) {
+        boardId = itemData.data.items[0].board.id;
+        core.info(`Found board ID: ${boardId} (Board: ${itemData.data.items[0].board.name})`);
       }
+    } catch (error) {
+      core.warning(`Failed to get board ID from item: ${error.message}`);
     }
-  `;
+  }
 
-  try {
-    const { data: boardsData } = await axios.post(mondayApiUrl, {
-      query: boardsQuery
-    }, { headers });
-
-    if (boardsData.errors) {
-      core.error('Failed to get user info:', boardsData.errors);
-      return;
-    }
-
-    core.info('Successfully connected to Monday.com API');
-  } catch (error) {
-    core.error('Failed to connect to Monday.com:', error.message);
+  if (!boardId) {
+    core.error('Could not determine board ID. Please provide monday_board_id input.');
     return;
   }
 

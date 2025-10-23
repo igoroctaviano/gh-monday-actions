@@ -23,9 +23,6 @@ inputs:
   monday_api_token:
     description: 'Monday.com API token'
     required: true
-  monday_board_id:
-    description: 'Monday.com board ID where tasks are located'
-    required: true
   github_token:
     description: 'GitHub token for API access (optional - if not provided, will use GITHUB_TOKEN environment variable)'
     required: false
