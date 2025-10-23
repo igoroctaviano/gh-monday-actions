@@ -342,7 +342,7 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       core.info(`Escaped column value: ${escapedColumnValue}`);
       
       const updateMutation = `
-        mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
+        mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
           change_column_value(
             board_id: $boardId,
             item_id: $itemId,
