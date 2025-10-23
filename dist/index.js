@@ -488,6 +488,12 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
             query: columnInfoQuery
           }, { headers });
 
+          core.info(`Column query response:`, JSON.stringify(columnData, null, 2));
+
+          if (columnData.errors) {
+            core.warning(`Column query errors:`, columnData.errors);
+          }
+
           if (columnData.data && columnData.data.items && columnData.data.items.length > 0) {
             const item = columnData.data.items[0];
             core.info(`Available columns:`, item.column_values.map(col => `${col.title} (${col.id})`).join(', '));
@@ -536,9 +542,57 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
             } else {
               core.warning(`Column "${columnName}" not found. Available columns:`, item.column_values.map(col => col.title).join(', '));
             }
+          } else {
+            core.warning(`No item data returned from column query`);
           }
         } catch (error) {
           core.warning(`Approach 3 error: ${error.message}`);
+        }
+      }
+      
+      // Approach 3.5: Fallback - try change_simple_column_value with column name directly
+      if (!success) {
+        try {
+          core.info(`Trying approach 3.5: change_simple_column_value with column name directly`);
+          
+          const updateMutation35 = `
+            mutation ChangeSimpleColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
+              change_simple_column_value(
+                board_id: $boardId,
+                item_id: $itemId,
+                column_id: $columnId,
+                value: $value
+              ) {
+                id
+              }
+            }
+          `;
+
+          const variables35 = {
+            boardId: boardId,
+            itemId: itemId,
+            columnId: columnName,
+            value: columnValue
+          };
+
+          core.info(`Request body: ${JSON.stringify({query: updateMutation35, variables: variables35})}`);
+          
+          const { data: updateData35 } = await axios.post(mondayApiUrl, {
+            query: updateMutation35,
+            variables: variables35
+          }, { headers });
+
+          if (updateData35.errors) {
+            core.warning(`Approach 3.5 failed:`);
+            for (const error of updateData35.errors) {
+              core.warning(`  - ${error.message}`);
+            }
+          } else {
+            core.info(`Approach 3.5 succeeded!`);
+            success = true;
+          }
+        } catch (error) {
+          core.warning(`Approach 3.5 error: ${error.message}`);
         }
       }
       
