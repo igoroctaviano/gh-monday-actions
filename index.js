@@ -657,9 +657,8 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       core.info(`Escaped comment text: ${escapedCommentText}`);
       
       const commentMutation = `
-        mutation CreateUpdate($boardId: ID!, $itemId: ID!, $body: String!) {
+        mutation CreateUpdate($itemId: ID!, $body: String!) {
           create_update(
-            board_id: $boardId,
             item_id: $itemId,
             body: $body
           ) {
@@ -669,7 +668,6 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       `;
 
       const commentVariables = {
-        boardId: boardId,
         itemId: itemId,
         body: commentText
       };
