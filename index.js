@@ -331,9 +331,13 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       const columnValue = `${environment}${version}`;
       core.info(`Updating column "${columnName}" with value: "${columnValue}"`);
       
-      // Escape the column value for JSON
-      const escapedColumnValue = JSON.stringify(columnValue);
-      core.info(`Escaped column value: ${escapedColumnValue}`);
+      // Format the value as a JSON object for Monday.com API
+      // For text columns, the value should be wrapped in a JSON object
+      const jsonValue = {
+        text: columnValue
+      };
+      
+      core.info(`JSON value object: ${JSON.stringify(jsonValue)}`);
       
       const updateMutation = `
         mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
@@ -352,7 +356,7 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         boardId: boardId,
         itemId: itemId,
         columnId: columnName,
-        value: columnValue
+        value: jsonValue
       };
 
       core.info(`Executing update mutation with variables:`, JSON.stringify(variables));
