@@ -52,6 +52,5 @@ jobs:
           environment: ${{ github.event.inputs.environment }}
           description: ${{ github.event.inputs.description }}
           monday_column_name: ${{ github.event.inputs.monday_column_name }}
-          monday_board_id: ${{ vars.MONDAY_BOARD_ID }}
           monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
