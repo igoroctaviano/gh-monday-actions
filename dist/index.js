@@ -369,285 +369,76 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       const columnValue = `${environment}${version}`;
       core.info(`Updating column "${columnName}" with value: "${columnValue}"`);
       
-      // Try different approaches for Monday.com API
-      let success = false;
-      
-      // Approach 1: Use column name with text format
-      try {
-        core.info(`Trying approach 1: column name with text format`);
-        const jsonValue1 = {
-          text: columnValue
-        };
-        
-        const updateMutation1 = `
-          mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
-            change_column_value(
-              board_id: $boardId,
-              item_id: $itemId,
-              column_id: $columnId,
-              value: $value
-            ) {
+      // Get board column information to find the actual column ID
+      const boardColumnQuery = `
+        query {
+          boards(ids: [${boardId}]) {
+            id
+            name
+            columns {
               id
+              title
+              type
             }
           }
-        `;
-
-        const variables1 = {
-          boardId: boardId,
-          itemId: itemId,
-          columnId: columnName,
-          value: jsonValue1
-        };
-
-        core.info(`Request body: ${JSON.stringify({query: updateMutation1, variables: variables1})}`);
-        
-        const { data: updateData1 } = await axios.post(mondayApiUrl, {
-          query: updateMutation1,
-          variables: variables1
-        }, { headers });
-
-        if (updateData1.errors) {
-          core.warning(`Approach 1 failed:`);
-          for (const error of updateData1.errors) {
-            core.warning(`  - ${error.message}`);
-          }
-        } else {
-          core.info(`Approach 1 succeeded!`);
-          success = true;
         }
-      } catch (error) {
-        core.warning(`Approach 1 error: ${error.message}`);
+      `;
+
+      const { data: boardColumnData } = await axios.post(mondayApiUrl, {
+        query: boardColumnQuery
+      }, { headers });
+
+      if (boardColumnData.errors) {
+        core.error(`Failed to get column information:`, boardColumnData.errors);
+        failedTasksCount++;
+        continue;
       }
+
+      if (!boardColumnData.data || !boardColumnData.data.boards || boardColumnData.data.boards.length === 0) {
+        core.error(`No board data returned for board ID: ${boardId}`);
+        failedTasksCount++;
+        continue;
+      }
+
+      const board = boardColumnData.data.boards[0];
+      const targetColumn = board.columns.find(col => col.title === columnName);
       
-      // Approach 2: Use column name with plain string
-      if (!success) {
-        try {
-          core.info(`Trying approach 2: column name with plain string`);
-          const updateMutation2 = `
-            mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
-              change_column_value(
-                board_id: $boardId,
-                item_id: $itemId,
-                column_id: $columnId,
-                value: $value
-              ) {
-                id
-              }
-            }
-          `;
+      if (!targetColumn) {
+        core.error(`Column "${columnName}" not found. Available columns: ${board.columns.map(col => col.title).join(', ')}`);
+        failedTasksCount++;
+        continue;
+      }
 
-          const variables2 = {
-            boardId: boardId,
-            itemId: itemId,
-            columnId: columnName,
-            value: columnValue
-          };
-
-          core.info(`Request body: ${JSON.stringify({query: updateMutation2, variables: variables2})}`);
-          
-          const { data: updateData2 } = await axios.post(mondayApiUrl, {
-            query: updateMutation2,
-            variables: variables2
-          }, { headers });
-
-          if (updateData2.errors) {
-            core.warning(`Approach 2 failed:`);
-            for (const error of updateData2.errors) {
-              core.warning(`  - ${error.message}`);
-            }
-          } else {
-            core.info(`Approach 2 succeeded!`);
-            success = true;
+      core.info(`Found column "${columnName}" with ID: ${targetColumn.id}, Type: ${targetColumn.type}`);
+      
+      // Update the column using change_simple_column_value mutation
+      const updateMutation = `
+        mutation ChangeSimpleColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
+          change_simple_column_value(
+            board_id: $boardId,
+            item_id: $itemId,
+            column_id: $columnId,
+            value: $value
+          ) {
+            id
           }
-        } catch (error) {
-          core.warning(`Approach 2 error: ${error.message}`);
         }
-      }
-      
-      // Approach 3: Get column ID and use change_simple_column_value mutation
-      if (!success) {
-        try {
-          core.info(`Trying approach 3: get column ID and use change_simple_column_value`);
-          
-          // Get column information to find the actual column ID
-          // Try different query approaches
-          const columnInfoQuery = `
-            query {
-              boards(ids: [${boardId}]) {
-                id
-                name
-                columns {
-                  id
-                  title
-                  type
-                }
-              }
-            }
-          `;
+      `;
 
-          const { data: columnData } = await axios.post(mondayApiUrl, {
-            query: columnInfoQuery
-          }, { headers });
+      const variables = {
+        boardId: boardId,
+        itemId: itemId,
+        columnId: targetColumn.id,
+        value: columnValue
+      };
 
-          core.info(`Column query response:`, JSON.stringify(columnData, null, 2));
+      const { data: updateData } = await axios.post(mondayApiUrl, {
+        query: updateMutation,
+        variables: variables
+      }, { headers });
 
-          if (columnData.errors) {
-            core.warning(`Column query errors:`, columnData.errors);
-          }
-
-          if (columnData.data && columnData.data.boards && columnData.data.boards.length > 0) {
-            const board = columnData.data.boards[0];
-            core.info(`Available columns:`, board.columns.map(col => `${col.title} (${col.id})`).join(', '));
-            
-            const targetColumn = board.columns.find(col => col.title === columnName);
-            
-            if (targetColumn) {
-              core.info(`Found column "${columnName}" with ID: ${targetColumn.id}, Type: ${targetColumn.type}`);
-              
-              const updateMutation3 = `
-                mutation ChangeSimpleColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
-                  change_simple_column_value(
-                    board_id: $boardId,
-                    item_id: $itemId,
-                    column_id: $columnId,
-                    value: $value
-                  ) {
-                    id
-                  }
-                }
-              `;
-
-              const variables3 = {
-                boardId: boardId,
-                itemId: itemId,
-                columnId: targetColumn.id,
-                value: columnValue
-              };
-
-              core.info(`Request body: ${JSON.stringify({query: updateMutation3, variables: variables3})}`);
-              
-              const { data: updateData3 } = await axios.post(mondayApiUrl, {
-                query: updateMutation3,
-                variables: variables3
-              }, { headers });
-
-              if (updateData3.errors) {
-                core.warning(`Approach 3 failed:`);
-                for (const error of updateData3.errors) {
-                  core.warning(`  - ${error.message}`);
-                }
-              } else {
-                core.info(`Approach 3 succeeded!`);
-                success = true;
-              }
-            } else {
-              core.warning(`Column "${columnName}" not found. Available columns:`, board.columns.map(col => col.title).join(', '));
-            }
-          } else {
-            core.warning(`No board data returned from column query`);
-          }
-        } catch (error) {
-          core.warning(`Approach 3 error: ${error.message}`);
-        }
-      }
-      
-      // Approach 3.5: Fallback - try change_simple_column_value with column name directly
-      if (!success) {
-        try {
-          core.info(`Trying approach 3.5: change_simple_column_value with column name directly`);
-          
-          const updateMutation35 = `
-            mutation ChangeSimpleColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
-              change_simple_column_value(
-                board_id: $boardId,
-                item_id: $itemId,
-                column_id: $columnId,
-                value: $value
-              ) {
-                id
-              }
-            }
-          `;
-
-          const variables35 = {
-            boardId: boardId,
-            itemId: itemId,
-            columnId: columnName,
-            value: columnValue
-          };
-
-          core.info(`Request body: ${JSON.stringify({query: updateMutation35, variables: variables35})}`);
-          
-          const { data: updateData35 } = await axios.post(mondayApiUrl, {
-            query: updateMutation35,
-            variables: variables35
-          }, { headers });
-
-          if (updateData35.errors) {
-            core.warning(`Approach 3.5 failed:`);
-            for (const error of updateData35.errors) {
-              core.warning(`  - ${error.message}`);
-            }
-          } else {
-            core.info(`Approach 3.5 succeeded!`);
-            success = true;
-          }
-        } catch (error) {
-          core.warning(`Approach 3.5 error: ${error.message}`);
-        }
-      }
-      
-      // Approach 4: Try different JSON format
-      if (!success) {
-        try {
-          core.info(`Trying approach 4: different JSON format`);
-          
-          const updateMutation4 = `
-            mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
-              change_column_value(
-                board_id: $boardId,
-                item_id: $itemId,
-                column_id: $columnId,
-                value: $value
-              ) {
-                id
-              }
-            }
-          `;
-
-          const variables4 = {
-            boardId: boardId,
-            itemId: itemId,
-            columnId: columnName,
-            value: {
-              text: columnValue,
-              index: 0
-            }
-          };
-
-          core.info(`Request body: ${JSON.stringify({query: updateMutation4, variables: variables4})}`);
-          
-          const { data: updateData4 } = await axios.post(mondayApiUrl, {
-            query: updateMutation4,
-            variables: variables4
-          }, { headers });
-
-          if (updateData4.errors) {
-            core.warning(`Approach 4 failed:`);
-            for (const error of updateData4.errors) {
-              core.warning(`  - ${error.message}`);
-            }
-          } else {
-            core.info(`Approach 4 succeeded!`);
-            success = true;
-          }
-        } catch (error) {
-          core.warning(`Approach 4 error: ${error.message}`);
-        }
-      }
-      
-      if (!success) {
-        core.error(`All approaches failed for task ${taskId}`);
+      if (updateData.errors) {
+        core.error(`Failed to update column for task ${taskId}:`, updateData.errors);
         failedTasksCount++;
         continue;
       }
@@ -656,11 +447,6 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
 
       // Add comment to the task
       const commentText = `Version: ${version}\nEnvironment: ${environment}\nDescription: ${description}`;
-      core.info(`Adding comment to task ${taskId}: ${commentText}`);
-      
-      // Escape the comment text for JSON
-      const escapedCommentText = JSON.stringify(commentText);
-      core.info(`Escaped comment text: ${escapedCommentText}`);
       
       const commentMutation = `
         mutation CreateUpdate($itemId: ID!, $body: String!) {
@@ -678,19 +464,13 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         body: commentText
       };
 
-      core.info(`Executing comment mutation with variables:`, JSON.stringify(commentVariables));
-
       const { data: commentData } = await axios.post(mondayApiUrl, {
         query: commentMutation,
         variables: commentVariables
       }, { headers });
 
-      // Check for comment errors
       if (commentData.errors) {
-        core.error(`Failed to add comment for task ${taskId}:`);
-        for (const error of commentData.errors) {
-          core.error(`  - ${error.message}`);
-        }
+        core.warning(`Failed to add comment for task ${taskId}:`, commentData.errors[0].message);
       } else {
         core.info(`Successfully added comment to task ${taskId}`);
       }

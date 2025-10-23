@@ -45,7 +45,7 @@ jobs:
       
       # Using gh-monday-actions
       - name: Update Monday.com tasks
-        uses: igoroctaviano/gh-monday-actions@main
+        uses: igoroctaviano/gh-monday-actions@v1
         with:
           commit_range: ${{ github.event.inputs.commit_range }}
           version: ${{ github.event.inputs.version }}

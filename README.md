@@ -8,6 +8,7 @@ This GitHub Action automatically updates Monday.com tasks based on pull request 
 - 📝 Extracts task IDs from PR descriptions using "Ticket number:" format
 - 🔄 Updates Monday.com column values with environment + version
 - 💬 Adds formatted comments to Monday.com tasks
+- 🎯 Auto-detects board ID from task ID (no manual configuration needed)
 - ⚙️ Manual workflow dispatch with customizable inputs
 
 ## Setup
@@ -125,7 +126,8 @@ Ticket number: TASK-123
 1. **Analyzes commits** in the specified range
 2. **Finds associated PRs** for those commits
 3. **Extracts task IDs** from PR descriptions using "Ticket number:" format
-4. **Updates Monday.com tasks** with:
+4. **Auto-detects board ID** from the first task ID found
+5. **Updates Monday.com tasks** with:
    - Column value: `{environment}{version}` (e.g., `staging1.2.3`)
    - Comment with version, environment, and description
 
@@ -145,7 +147,9 @@ For a task with ID `TASK-123`, the action will:
 
 - If no task IDs are found in PR descriptions, the action will warn but not fail
 - If a task ID is not found in Monday.com, it will be skipped with a warning
+- If a column name is not found, the action will list available columns and fail
 - API errors are logged with detailed error information
+- The action only reports success if tasks are actually updated
 
 ## Requirements
 
@@ -161,6 +165,8 @@ For a task with ID `TASK-123`, the action will:
 1. **No task IDs found**: Ensure PR descriptions contain "Ticket number:" followed by the task ID
 2. **Monday.com API errors**: Verify your API token has the necessary permissions
 3. **Commit range errors**: Ensure the commit hash range is valid and accessible
+4. **Column not found**: Check that the column name exactly matches the Monday.com column title
+5. **Board ID detection fails**: Ensure the task ID exists and is accessible with your API token
 
 ### Debugging
 
