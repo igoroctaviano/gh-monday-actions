@@ -470,12 +470,13 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
           core.info(`Trying approach 3: get column ID and use change_simple_column_value`);
           
           // Get column information to find the actual column ID
+          // Try different query approaches
           const columnInfoQuery = `
             query {
-              items(ids: [${itemId}]) {
+              boards(ids: [${boardId}]) {
                 id
                 name
-                column_values {
+                columns {
                   id
                   title
                   type
@@ -494,11 +495,11 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
             core.warning(`Column query errors:`, columnData.errors);
           }
 
-          if (columnData.data && columnData.data.items && columnData.data.items.length > 0) {
-            const item = columnData.data.items[0];
-            core.info(`Available columns:`, item.column_values.map(col => `${col.title} (${col.id})`).join(', '));
+          if (columnData.data && columnData.data.boards && columnData.data.boards.length > 0) {
+            const board = columnData.data.boards[0];
+            core.info(`Available columns:`, board.columns.map(col => `${col.title} (${col.id})`).join(', '));
             
-            const targetColumn = item.column_values.find(col => col.title === columnName);
+            const targetColumn = board.columns.find(col => col.title === columnName);
             
             if (targetColumn) {
               core.info(`Found column "${columnName}" with ID: ${targetColumn.id}, Type: ${targetColumn.type}`);
@@ -540,10 +541,10 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
                 success = true;
               }
             } else {
-              core.warning(`Column "${columnName}" not found. Available columns:`, item.column_values.map(col => col.title).join(', '));
+              core.warning(`Column "${columnName}" not found. Available columns:`, board.columns.map(col => col.title).join(', '));
             }
           } else {
-            core.warning(`No item data returned from column query`);
+            core.warning(`No board data returned from column query`);
           }
         } catch (error) {
           core.warning(`Approach 3 error: ${error.message}`);
