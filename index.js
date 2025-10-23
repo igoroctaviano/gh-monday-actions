@@ -54,7 +54,7 @@ async function run() {
     // Update Monday.com tasks
     await updateMondayTasks(mondayApiToken, taskIds, mondayColumnName, version, environment, description);
 
-    core.info('Successfully updated Monday.com tasks');
+    // Note: updateMondayTasks will handle success/failure reporting internally
   } catch (error) {
     core.setFailed(`Action failed with error: ${error.message}`);
   }
@@ -168,6 +168,9 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
     'Content-Type': 'application/json'
   };
 
+  let updatedTasksCount = 0;
+  let failedTasksCount = 0;
+
   // First, try to find the board ID from the first task ID
   let boardId = null;
   
@@ -213,9 +216,22 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
     try {
       core.info(`Looking for task ${taskId} in Monday.com`);
       
-      // First, get the task details to find the item ID
-      // Use the updated Monday.com API syntax with board_id and columns
+      // First, let's try to get the item directly by ID (since we know the item ID exists)
       let taskQuery = `
+        query {
+          items(ids: [${taskId}]) {
+            id
+            name
+            column_values {
+              id
+              text
+            }
+          }
+        }
+      `;
+
+      // Alternative: search by name column
+      const searchByNameQuery = `
         query {
           items_page_by_column_values(limit: 1, board_id: ${boardId}, columns: [{column_id: "name", column_values: ["${taskId}"]}]) {
             items {
@@ -230,8 +246,8 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         }
       `;
 
-      // Alternative query if the first one fails
-      const alternativeQuery = `
+      // Alternative: search by title column
+      const searchByTitleQuery = `
         query {
           items_page_by_column_values(limit: 1, board_id: ${boardId}, columns: [{column_id: "title", column_values: ["${taskId}"]}]) {
             items {
@@ -247,42 +263,68 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       `;
 
       let taskData;
+      let itemId = null;
       
-      // Try the first query
+      // Try direct item lookup first (most reliable)
       try {
+        core.info(`Trying direct item lookup for task ${taskId}`);
         const response = await axios.post(mondayApiUrl, {
           query: taskQuery
         }, { headers });
         taskData = response.data;
-      } catch (error) {
-        core.warning(`First query failed for task ${taskId}, trying alternative: ${error.message}`);
-        // Try alternative query
-        const response = await axios.post(mondayApiUrl, {
-          query: alternativeQuery
-        }, { headers });
-        taskData = response.data;
-      }
-
-      core.info(`Monday.com API response for task ${taskId}:`, JSON.stringify(taskData, null, 2));
-
-      // Check for API errors first
-      if (taskData.errors) {
-        core.error(`Monday.com API errors for task ${taskId}:`);
-        for (const error of taskData.errors) {
-          core.error(`  - ${error.message}`);
-          if (error.extensions) {
-            core.error(`    Extensions: ${JSON.stringify(error.extensions)}`);
-          }
+        
+        if (taskData.data && taskData.data.items && taskData.data.items.length > 0) {
+          itemId = taskData.data.items[0].id;
+          core.info(`Found task ${taskId} directly with item ID: ${itemId}`);
         }
+      } catch (error) {
+        core.warning(`Direct lookup failed for task ${taskId}: ${error.message}`);
+      }
+      
+      // If direct lookup failed, try searching by name column
+      if (!itemId) {
+        try {
+          core.info(`Trying search by name column for task ${taskId}`);
+          const response = await axios.post(mondayApiUrl, {
+            query: searchByNameQuery
+          }, { headers });
+          taskData = response.data;
+          
+          if (taskData.data && taskData.data.items_page_by_column_values && taskData.data.items_page_by_column_values.items && taskData.data.items_page_by_column_values.items.length > 0) {
+            itemId = taskData.data.items_page_by_column_values.items[0].id;
+            core.info(`Found task ${taskId} by name search with item ID: ${itemId}`);
+          }
+        } catch (error) {
+          core.warning(`Name search failed for task ${taskId}: ${error.message}`);
+        }
+      }
+      
+      // If still not found, try searching by title column
+      if (!itemId) {
+        try {
+          core.info(`Trying search by title column for task ${taskId}`);
+          const response = await axios.post(mondayApiUrl, {
+            query: searchByTitleQuery
+          }, { headers });
+          taskData = response.data;
+          
+          if (taskData.data && taskData.data.items_page_by_column_values && taskData.data.items_page_by_column_values.items && taskData.data.items_page_by_column_values.items.length > 0) {
+            itemId = taskData.data.items_page_by_column_values.items[0].id;
+            core.info(`Found task ${taskId} by title search with item ID: ${itemId}`);
+          }
+        } catch (error) {
+          core.warning(`Title search failed for task ${taskId}: ${error.message}`);
+        }
+      }
+
+      // Check if we found the item
+      if (!itemId) {
+        core.warning(`Task ${taskId} not found in Monday.com using any search method`);
+        core.info(`Monday.com API response for task ${taskId}:`, JSON.stringify(taskData, null, 2));
+        failedTasksCount++;
         continue;
       }
 
-      if (!taskData.data || !taskData.data.items_page_by_column_values || !taskData.data.items_page_by_column_values.items || taskData.data.items_page_by_column_values.items.length === 0) {
-        core.warning(`Task ${taskId} not found in Monday.com`);
-        continue;
-      }
-
-      const itemId = taskData.data.items_page_by_column_values.items[0].id;
       core.info(`Found task ${taskId} with item ID: ${itemId}`);
 
       // Update the column value
@@ -346,12 +388,26 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       }
 
       core.info(`Successfully updated task ${taskId} (item ID: ${itemId})`);
+      updatedTasksCount++;
     } catch (error) {
       core.error(`Failed to update task ${taskId}: ${error.message}`);
       if (error.response) {
         core.error(`Response data: ${JSON.stringify(error.response.data)}`);
       }
+      failedTasksCount++;
     }
+  }
+
+  // Report final results
+  core.info(`\n=== UPDATE SUMMARY ===`);
+  core.info(`Total tasks processed: ${taskIds.length}`);
+  core.info(`Successfully updated: ${updatedTasksCount}`);
+  core.info(`Failed: ${failedTasksCount}`);
+  
+  if (updatedTasksCount === 0) {
+    core.setFailed('No tasks were successfully updated');
+  } else if (failedTasksCount > 0) {
+    core.warning(`${failedTasksCount} tasks failed to update`);
   }
 }
 
