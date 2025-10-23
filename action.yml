@@ -26,6 +26,10 @@ inputs:
   github_token:
     description: 'GitHub token for API access (optional - if not provided, will use GITHUB_TOKEN environment variable)'
     required: false
+  ticket_regex_pattern:
+    description: 'Regex pattern to extract task IDs from PR descriptions (default: "Ticket number:\s*([A-Za-z0-9\-_]+)")'
+    required: false
+    default: 'Ticket number:\s*([A-Za-z0-9\-_]+)'
 
 runs:
   using: 'node20'

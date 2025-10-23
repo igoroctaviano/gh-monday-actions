@@ -21,6 +21,8 @@ async function run() {
     const githubToken = core.getInput('github_token') || process.env.GITHUB_TOKEN;
     // Get Monday API token from input (required)
     const mondayApiToken = core.getInput('monday_api_token', { required: true });
+    // Get ticket regex pattern (optional, with default)
+    const ticketRegexPattern = core.getInput('ticket_regex_pattern');
     
     if (!githubToken) {
       core.setFailed('GitHub token not found. Please provide github_token input or ensure GITHUB_TOKEN environment variable is available.');
@@ -49,7 +51,7 @@ async function run() {
     }
 
     // Extract task IDs from PR descriptions
-    const taskIds = extractTaskIdsFromPRs(pullRequests);
+    const taskIds = extractTaskIdsFromPRs(pullRequests, ticketRegexPattern);
     core.info(`Extracted task IDs: ${taskIds.join(', ')}`);
 
     if (taskIds.length === 0) {
@@ -148,9 +150,14 @@ async function findPRsFallbackMethod(octokit, commitHash, repo, pullRequests) {
   }
 }
 
-function extractTaskIdsFromPRs(pullRequests) {
+function extractTaskIdsFromPRs(pullRequests, regexPattern) {
   const taskIds = new Set();
-  const ticketRegex = /Ticket number:\s*([A-Za-z0-9\-_]+)/gi;
+  // Use provided regex pattern or default to the original pattern
+  const defaultPattern = 'Ticket number:\\s*([A-Za-z0-9\\-_]+)';
+  const pattern = regexPattern || defaultPattern;
+  const ticketRegex = new RegExp(pattern, 'gi');
+  
+  core.info(`Using regex pattern to extract task IDs: ${pattern}`);
 
   for (const pr of pullRequests) {
     const description = pr.body || '';
