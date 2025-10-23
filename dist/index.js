@@ -340,6 +340,7 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       const updateMutation = `
         mutation {
           change_column_value(
+            board_id: ${boardId},
             item_id: ${itemId},
             column_id: "${columnName}",
             value: "${columnValue}"
@@ -371,6 +372,7 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       const commentMutation = `
         mutation {
           create_update(
+            board_id: ${boardId},
             item_id: ${itemId},
             body: "${commentText}"
           ) {
