@@ -342,23 +342,35 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       core.info(`Escaped column value: ${escapedColumnValue}`);
       
       const updateMutation = `
-        mutation {
+        mutation ChangeColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
           change_column_value(
-            board_id: ${boardId},
-            item_id: ${itemId},
-            column_id: "${columnName}",
-            value: ${escapedColumnValue}
+            board_id: $boardId,
+            item_id: $itemId,
+            column_id: $columnId,
+            value: $value
           ) {
             id
           }
         }
       `;
 
-      core.info(`Executing update mutation: ${updateMutation}`);
+      const variables = {
+        boardId: boardId,
+        itemId: itemId,
+        columnId: columnName,
+        value: columnValue
+      };
+
+      core.info(`Executing update mutation with variables:`, JSON.stringify(variables));
       
-      const { data: updateData } = await axios.post(mondayApiUrl, {
-        query: updateMutation
-      }, { headers });
+      const requestBody = {
+        query: updateMutation,
+        variables: variables
+      };
+      
+      core.info(`Request body: ${JSON.stringify(requestBody)}`);
+      
+      const { data: updateData } = await axios.post(mondayApiUrl, requestBody, { headers });
 
       // Check for update errors
       if (updateData.errors) {
@@ -380,19 +392,28 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       core.info(`Escaped comment text: ${escapedCommentText}`);
       
       const commentMutation = `
-        mutation {
+        mutation CreateUpdate($boardId: ID!, $itemId: ID!, $body: String!) {
           create_update(
-            board_id: ${boardId},
-            item_id: ${itemId},
-            body: ${escapedCommentText}
+            board_id: $boardId,
+            item_id: $itemId,
+            body: $body
           ) {
             id
           }
         }
       `;
 
+      const commentVariables = {
+        boardId: boardId,
+        itemId: itemId,
+        body: commentText
+      };
+
+      core.info(`Executing comment mutation with variables:`, JSON.stringify(commentVariables));
+
       const { data: commentData } = await axios.post(mondayApiUrl, {
-        query: commentMutation
+        query: commentMutation,
+        variables: commentVariables
       }, { headers });
 
       // Check for comment errors
