@@ -464,46 +464,78 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
         }
       }
       
-      // Approach 3: Try change_simple_column_value mutation
+      // Approach 3: Get column ID and use change_simple_column_value mutation
       if (!success) {
         try {
-          core.info(`Trying approach 3: change_simple_column_value mutation`);
+          core.info(`Trying approach 3: get column ID and use change_simple_column_value`);
           
-          const updateMutation3 = `
-            mutation ChangeSimpleColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
-              change_simple_column_value(
-                board_id: $boardId,
-                item_id: $itemId,
-                column_id: $columnId,
-                value: $value
-              ) {
+          // Get column information to find the actual column ID
+          const columnInfoQuery = `
+            query {
+              items(ids: [${itemId}]) {
                 id
+                name
+                column_values {
+                  id
+                  title
+                  type
+                }
               }
             }
           `;
 
-          const variables3 = {
-            boardId: boardId,
-            itemId: itemId,
-            columnId: columnName,
-            value: columnValue
-          };
-
-          core.info(`Request body: ${JSON.stringify({query: updateMutation3, variables: variables3})}`);
-          
-          const { data: updateData3 } = await axios.post(mondayApiUrl, {
-            query: updateMutation3,
-            variables: variables3
+          const { data: columnData } = await axios.post(mondayApiUrl, {
+            query: columnInfoQuery
           }, { headers });
 
-          if (updateData3.errors) {
-            core.warning(`Approach 3 failed:`);
-            for (const error of updateData3.errors) {
-              core.warning(`  - ${error.message}`);
+          if (columnData.data && columnData.data.items && columnData.data.items.length > 0) {
+            const item = columnData.data.items[0];
+            core.info(`Available columns:`, item.column_values.map(col => `${col.title} (${col.id})`).join(', '));
+            
+            const targetColumn = item.column_values.find(col => col.title === columnName);
+            
+            if (targetColumn) {
+              core.info(`Found column "${columnName}" with ID: ${targetColumn.id}, Type: ${targetColumn.type}`);
+              
+              const updateMutation3 = `
+                mutation ChangeSimpleColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
+                  change_simple_column_value(
+                    board_id: $boardId,
+                    item_id: $itemId,
+                    column_id: $columnId,
+                    value: $value
+                  ) {
+                    id
+                  }
+                }
+              `;
+
+              const variables3 = {
+                boardId: boardId,
+                itemId: itemId,
+                columnId: targetColumn.id,
+                value: columnValue
+              };
+
+              core.info(`Request body: ${JSON.stringify({query: updateMutation3, variables: variables3})}`);
+              
+              const { data: updateData3 } = await axios.post(mondayApiUrl, {
+                query: updateMutation3,
+                variables: variables3
+              }, { headers });
+
+              if (updateData3.errors) {
+                core.warning(`Approach 3 failed:`);
+                for (const error of updateData3.errors) {
+                  core.warning(`  - ${error.message}`);
+                }
+              } else {
+                core.info(`Approach 3 succeeded!`);
+                success = true;
+              }
+            } else {
+              core.warning(`Column "${columnName}" not found. Available columns:`, item.column_values.map(col => col.title).join(', '));
             }
-          } else {
-            core.info(`Approach 3 succeeded!`);
-            success = true;
           }
         } catch (error) {
           core.warning(`Approach 3 error: ${error.message}`);
