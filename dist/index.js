@@ -337,19 +337,25 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       const columnValue = `${environment}${version}`;
       core.info(`Updating column "${columnName}" with value: "${columnValue}"`);
       
+      // Escape the column value for JSON
+      const escapedColumnValue = JSON.stringify(columnValue);
+      core.info(`Escaped column value: ${escapedColumnValue}`);
+      
       const updateMutation = `
         mutation {
           change_column_value(
             board_id: ${boardId},
             item_id: ${itemId},
             column_id: "${columnName}",
-            value: "${columnValue}"
+            value: ${escapedColumnValue}
           ) {
             id
           }
         }
       `;
 
+      core.info(`Executing update mutation: ${updateMutation}`);
+      
       const { data: updateData } = await axios.post(mondayApiUrl, {
         query: updateMutation
       }, { headers });
@@ -369,12 +375,16 @@ async function updateMondayTasks(apiToken, taskIds, columnName, version, environ
       const commentText = `Version: ${version}\nEnvironment: ${environment}\nDescription: ${description}`;
       core.info(`Adding comment to task ${taskId}: ${commentText}`);
       
+      // Escape the comment text for JSON
+      const escapedCommentText = JSON.stringify(commentText);
+      core.info(`Escaped comment text: ${escapedCommentText}`);
+      
       const commentMutation = `
         mutation {
           create_update(
             board_id: ${boardId},
             item_id: ${itemId},
-            body: "${commentText}"
+            body: ${escapedCommentText}
           ) {
             id
           }
