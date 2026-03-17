@@ -1,38 +1,69 @@
-# igoroctaviano/gh-monday-actions
+# gh-monday-actions
 
-This GitHub Action automatically updates Monday.com tasks based on pull request descriptions within a specified commit range.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+A GitHub Action that syncs Monday.com tasks with your release workflow by analyzing pull requests in a commit range and updating board items with deployment metadata (version, environment, description).
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Setup](#setup)
+- [Usage](#usage)
+- [Inputs](#inputs)
+- [PR description format](#pr-description-format)
+- [Behavior](#behavior)
+- [Error handling](#error-handling)
+- [Troubleshooting](#troubleshooting)
+- [Publishing](#publishing)
+- [License](#license)
+
+---
 
 ## Features
 
-- 🔍 Analyzes commit ranges to find associated pull requests
-- 📝 Extracts task IDs from PR descriptions using "Ticket number:" format
-- 🔄 Updates Monday.com column values with environment + version
-- 💬 Adds formatted comments to Monday.com tasks
-- 🎯 Auto-detects board ID from task ID (no manual configuration needed)
-- ⚙️ Manual workflow dispatch with customizable inputs
+- **Commit-range analysis** — Finds pull requests associated with a given commit range
+- **Task ID extraction** — Parses task IDs from PR descriptions (configurable regex)
+- **Monday.com updates** — Writes column values and adds comments to matching tasks
+- **Board auto-detection** — Resolves board ID from task IDs (no manual board config)
+- **Manual dispatch** — Workflow dispatch with inputs for version, environment, and column name
+
+---
+
+## Requirements
+
+- **Node.js** 20 or later (action runtime)
+- **GitHub** — Repository with Actions enabled, sufficient fetch depth for commit history
+- **Monday.com** — Account with API access and an API token
+- **PR descriptions** — Pull requests in the range must include task IDs in the [expected format](#pr-description-format)
+
+---
 
 ## Setup
 
-### 1. Required Secrets
+### 1. Repository secrets
 
-Add these secrets to your GitHub repository:
+Configure the following secret in your repository (**Settings → Secrets and variables → Actions**):
 
-- `MONDAY_API_TOKEN`: Your Monday.com API token
+| Secret               | Description                    |
+|----------------------|--------------------------------|
+| `MONDAY_API_TOKEN`   | Your Monday.com API token      |
 
-### 2. Monday.com API Token
+### 2. Monday.com API token
 
-To get your Monday.com API token:
+1. In Monday.com, go to **Admin** → **API**.
+2. Create a new API token with access to the boards and columns you want to update.
+3. Add it as the `MONDAY_API_TOKEN` repository secret.
 
-1. Go to your Monday.com account
-2. Navigate to Admin → API
-3. Generate a new API token
-4. Add it as a repository secret named `MONDAY_API_TOKEN`
+---
 
 ## Usage
 
-### Quick Start
+### Quick start
 
-Copy this workflow to your repository's `.github/workflows/` directory:
+Add a workflow under `.github/workflows/` (e.g. `monday-sync.yml`):
 
 ```yaml
 name: Update Monday.com Tasks
@@ -78,7 +109,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Update Monday.com tasks
         uses: igoroctaviano/gh-monday-actions@v1
         with:
@@ -91,94 +122,91 @@ jobs:
           monday_api_token: ${{ secrets.MONDAY_API_TOKEN }}
 ```
 
-### Manual Trigger
+### Running the workflow
 
-1. Go to your repository's Actions tab
-2. Select "Update Monday.com Tasks" workflow
-3. Click "Run workflow"
-4. Fill in the required inputs:
-   - **Commit Range**: Git commit hash range (e.g., `abc123..def456`)
-   - **Version**: Version number (e.g., `1.2.3`)
-   - **Environment**: Environment name (`staging`, `production`, or `development`)
-   - **Description**: Deployment description
-   - **Monday Column Name**: Name of the Monday.com column to update
+1. Open the **Actions** tab and select **Update Monday.com Tasks**.
+2. Click **Run workflow**.
+3. Set the inputs (commit range, version, environment, description, Monday column name) and run.
 
-### Input Parameters
+A full example including optional `ticket_regex_pattern` is in [examples/example-workflow.yml](examples/example-workflow.yml).
 
-| Parameter | Description | Required | Example |
-|-----------|-------------|----------|---------|
-| `commit_range` | Git commit hash range | Yes | `abc123..def456` |
-| `version` | Version number | Yes | `1.2.3` |
-| `environment` | Environment name | Yes | `staging` |
-| `description` | Deployment description | Yes | `Bug fixes and improvements` |
-| `monday_column_name` | Monday.com column name | Yes | `Deployment Status` |
+---
 
-### PR Description Format
+## Inputs
 
-Your pull request descriptions should include task IDs in this format:
+| Input                 | Required | Description |
+|-----------------------|----------|-------------|
+| `commit_range`        | Yes      | Git commit range (e.g. `abc123..def456` or `HEAD~10..HEAD`). |
+| `version`             | Yes      | Version string (e.g. `1.2.3`). |
+| `environment`         | Yes      | Environment name (e.g. `staging`, `production`, `development`). |
+| `description`         | Yes      | Deployment description (e.g. used in Monday comments). |
+| `monday_column_name`  | Yes      | Exact title of the Monday.com column to update. |
+| `github_token`        | Yes      | Usually `${{ secrets.GITHUB_TOKEN }}` for PR/commit API access. |
+| `monday_api_token`    | Yes      | Monday.com API token (e.g. `${{ secrets.MONDAY_API_TOKEN }}`). |
+| `ticket_regex_pattern`| No       | Regex to extract task IDs from PR body (default matches `Ticket number: TASK-123` style). |
 
-```
+---
+
+## PR description format
+
+The action extracts task IDs from pull request bodies. Default pattern:
+
+```text
 Ticket number: TASK-123
 ```
 
-### What the Action Does
+You can override the pattern with `ticket_regex_pattern` (regex with one capture group for the task ID).
 
-1. **Analyzes commits** in the specified range
-2. **Finds associated PRs** for those commits
-3. **Extracts task IDs** from PR descriptions using "Ticket number:" format
-4. **Auto-detects board ID** from the first task ID found
-5. **Updates Monday.com tasks** with:
-   - Column value: `{environment}{version}` (e.g., `staging1.2.3`)
-   - Comment with version, environment, and description
+---
 
-### Example Output
+## Behavior
 
-For a task with ID `TASK-123`, the action will:
-- Update the specified column with `staging1.2.3`
-- Add a comment:
-  ```
-  Version: 1.2.3
-  Environment: staging
-  Description: Bug fixes and improvements
-  ```
+1. **Resolves commits** in the given `commit_range`.
+2. **Finds merge commits / PRs** for those commits via the GitHub API.
+3. **Extracts task IDs** from each PR body using the ticket regex.
+4. **Resolves Monday.com board** from the first task ID.
+5. **Updates each task**:
+   - Sets the chosen column to `{environment}{version}` (e.g. `staging1.2.3`).
+   - Adds a comment with version, environment, and description.
 
+---
 
-## Error Handling
+## Error handling
 
-- If no task IDs are found in PR descriptions, the action will warn but not fail
-- If a task ID is not found in Monday.com, it will be skipped with a warning
-- If a column name is not found, the action will list available columns and fail
-- API errors are logged with detailed error information
-- The action only reports success if tasks are actually updated
+- **No task IDs found** — Logs a warning; does not fail the workflow.
+- **Task not found in Monday.com** — Skips that task with a warning.
+- **Column not found** — Fails and logs available column names.
+- **API errors** — Logged with details; step fails on critical errors.
+- Success is reported only when at least one task is updated.
 
-## Requirements
-
-- Node.js 20+
-- GitHub repository with Actions enabled
-- Monday.com account with API access
-- Pull requests with properly formatted descriptions containing task IDs
+---
 
 ## Troubleshooting
 
-### Common Issues
+| Issue | What to check |
+|-------|----------------|
+| No task IDs found | PR descriptions in the range include the ticket line (e.g. `Ticket number: TASK-123`). |
+| Monday.com API errors | Token has correct scope and the board/item are accessible. |
+| Invalid commit range | Range is valid and the job has enough history (`fetch-depth: 0`). |
+| Column not found | Column name matches the board column title exactly (case-sensitive). |
+| Board detection fails | Task ID exists and the token can read that board. |
 
-1. **No task IDs found**: Ensure PR descriptions contain "Ticket number:" followed by the task ID
-2. **Monday.com API errors**: Verify your API token has the necessary permissions
-3. **Commit range errors**: Ensure the commit hash range is valid and accessible
-4. **Column not found**: Check that the column name exactly matches the Monday.com column title
-5. **Board ID detection fails**: Ensure the task ID exists and is accessible with your API token
+**Debug logging:** Add repository secret `ACTIONS_STEP_DEBUG` = `true` to enable verbose step logs.
 
-### Debugging
-
-Enable debug logging by adding this secret to your repository:
-- `ACTIONS_STEP_DEBUG`: `true`
-
-This will provide detailed logs of the action's execution.
+---
 
 ## Publishing
 
-This repository is the GitHub Action itself. To publish:
+This repo is the action source. To release a new version:
 
-1. **Build the action**: `npm run build`
-2. **Create a release**: Push a tag like `v1.0.0`
-3. **Use the action**: `uses: igoroctaviano/gh-monday-actions@v1`
+1. Build: `npm run build`
+2. Commit the `dist/` output (if you ship from this repo).
+3. Create a tag (e.g. `v1.0.0`) and push, or publish via GitHub Releases.
+
+Consumers can pin with `igoroctaviano/gh-monday-actions@v1` (or a specific tag).
+
+---
+
+## License
+
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for the full text.
